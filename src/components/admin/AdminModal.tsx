@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   loginAdmin,
   updateProfile,
@@ -99,6 +100,18 @@ export function AdminModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Confirm dialog state (replaces window.confirm)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description?: string;
+    onConfirm: () => void;
+  }>({ open: false, title: "", onConfirm: () => {} });
+
+  const closeConfirm = () =>
+    setConfirmDialog((d) => ({ ...d, open: false }));
+
 
   // Perfil form
   const [profileForm, setProfileForm] = useState({
@@ -203,16 +216,24 @@ export function AdminModal({
     }
   };
 
-  const handleDeleteExp = async (id: string) => {
-    if (!token || !window.confirm("¿Seguro que deseas eliminar este elemento?")) return;
-    setLoading(true);
-    const res = await deleteExperienceItem(id, token);
-    setLoading(false);
-    if (res.success) {
-      await onDataUpdated();
-    } else {
-      setError(res.error || "Error al eliminar");
-    }
+  const handleDeleteExp = (id: string) => {
+    if (!token) return;
+    setConfirmDialog({
+      open: true,
+      title: "¿Eliminar este elemento?",
+      description: "Esta acción no se puede deshacer.",
+      onConfirm: async () => {
+        closeConfirm();
+        setLoading(true);
+        const res = await deleteExperienceItem(id, token);
+        setLoading(false);
+        if (res.success) {
+          await onDataUpdated();
+        } else {
+          setError(res.error || "Error al eliminar");
+        }
+      },
+    });
   };
 
   // Image upload handling for projects
@@ -275,19 +296,27 @@ export function AdminModal({
     }
   };
 
-  const handleDeleteProject = async (id: string) => {
-    if (!token || !window.confirm("¿Seguro que deseas eliminar este proyecto del portafolio?")) return;
-    setLoading(true);
-    setError(null);
-    const res = await deleteProjectItem(id, token);
-    setLoading(false);
-    if (res.success) {
-      setSuccess("Proyecto eliminado correctamente.");
-      await onDataUpdated();
-      setTimeout(() => setSuccess(null), 3000);
-    } else {
-      setError(res.error || "Error al eliminar proyecto.");
-    }
+  const handleDeleteProject = (id: string) => {
+    if (!token) return;
+    setConfirmDialog({
+      open: true,
+      title: "¿Eliminar este proyecto?",
+      description: "Se eliminará del portafolio permanentemente. Esta acción no se puede deshacer.",
+      onConfirm: async () => {
+        closeConfirm();
+        setLoading(true);
+        setError(null);
+        const res = await deleteProjectItem(id, token);
+        setLoading(false);
+        if (res.success) {
+          setSuccess("Proyecto eliminado correctamente.");
+          await onDataUpdated();
+          setTimeout(() => setSuccess(null), 3000);
+        } else {
+          setError(res.error || "Error al eliminar proyecto.");
+        }
+      },
+    });
   };
 
   return (
@@ -987,6 +1016,15 @@ export function AdminModal({
           )}
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmLabel="Eliminar"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }
